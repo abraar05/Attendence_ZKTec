@@ -7,9 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: attendly-${{ github.workflow }}-${{ github.ref }}
@@ -36,16 +34,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
         run: npm ci
-      - name: Configure GitHub Pages
-        if: github.event_name != 'pull_request'
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - name: Build frontend
         run: npm run build
-      - name: Upload GitHub Pages artifact
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
-        with:
-          path: frontend/dist
 
   backend:
     name: Backend validation
@@ -79,33 +69,35 @@ jobs:
       - name: Build frontend image
         run: docker build --tag attendly-frontend:test ./frontend
 
-  deploy:
-    name: Deploy to hosting provider
-    runs-on: ubuntu-latest
-    needs: [containers]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Trigger deployment hook
-        env:
-          DEPLOY_HOOK_URL: ${{ secrets.DEPLOY_HOOK_URL }}
-        run: |
-          if [ -z "$DEPLOY_HOOK_URL" ]; then
-            echo "DEPLOY_HOOK_URL is not configured; skipping deployment."
-            echo "Add a repository secret named DEPLOY_HOOK_URL to enable automatic deployment."
-            exit 0
-          fi
-          curl --fail --silent --show-error --retry 3 --request POST "$DEPLOY_HOOK_URL"
-          echo "Deployment hook accepted."
-
   pages:
     name: Publish frontend to GitHub Pages
     runs-on: ubuntu-latest
     needs: [frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build frontend for Pages
+        working-directory: frontend
+        run: npm ci && npm run build
+      - name: Publish gh-pages branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p /tmp/attendly-pages
+          cp -R frontend/dist/. /tmp/attendly-pages/
+          touch /tmp/attendly-pages/.nojekyll
+          git fetch origin gh-pages || true
+          git worktree add --detach /tmp/attendly-pages-work
+          rm -rf /tmp/attendly-pages-work/* /tmp/attendly-pages-work/.[!.]* /tmp/attendly-pages-work/..?* 2>/dev/null || true
+          cp -R /tmp/attendly-pages/. /tmp/attendly-pages-work/
+          cd /tmp/attendly-pages-work
+          git add --all
+          git commit --allow-empty -m "deploy: publish frontend from $GITHUB_SHA"
+          git push --force origin HEAD:gh-pages
