@@ -20,3 +20,5 @@ Run the backend behind HTTPS, use a managed PostgreSQL backup policy, restrict d
 ## GitHub Actions
 
 The workflow in `.github/workflows/ci.yml` runs on pull requests, pushes to `main`, and manual dispatches. It installs dependencies from the lockfiles, builds the frontend, validates backend JavaScript, and builds both Docker images. On a successful push to `main`, it will also `POST` to the repository secret `DEPLOY_HOOK_URL` when that secret is configured. Add the deployment hook URL supplied by the hosting provider under **Settings → Secrets and variables → Actions → New repository secret**. If the secret is absent, checks still pass and deployment is explicitly skipped.
+
+The same workflow publishes the frontend to GitHub Pages on every successful `main` push at `https://abraar05.github.io/Attendence_ZKTec/`. GitHub Pages hosts the frontend only; configure `VITE_API_URL` with a hosted backend URL to make API-backed features work outside local development.

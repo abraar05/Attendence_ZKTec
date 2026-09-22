@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Employees from './pages/Employees.jsx';
@@ -19,7 +19,7 @@ function Layout({ children }) {
   const location = useLocation();
   useEffect(() => setMenuOpen(false), [location.pathname]);
   const links = [['/', 'Dashboard'], ['/employees', 'Employees'], ['/attendance', 'Attendance'], ['/reports', 'Reports'], ['/devices', 'Devices']];
-  function logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; }
+  function logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.hash = '#/login'; window.location.reload(); }
   return <div className="layout">
     <button className="menu-toggle" aria-label="Toggle navigation" onClick={() => setMenuOpen((open) => !open)}>☰</button>
     <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
@@ -86,7 +86,7 @@ export function getMonthRange() { return { startDate: getMonthStart(), endDate: 
 export function dateRangeLabel(start, end) { return `${start || '—'} to ${end || '—'}`; }
 
 export default function App() {
-  return <BrowserRouter><Routes>
+  return <HashRouter><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/" element={<Protected><Layout><Dashboard /></Layout></Protected>} />
     <Route path="/employees" element={<Protected><Layout><Employees /></Layout></Protected>} />
@@ -94,7 +94,7 @@ export default function App() {
     <Route path="/reports" element={<Protected><Layout><Reports /></Layout></Protected>} />
     <Route path="/devices" element={<Protected><Layout><Devices /></Layout></Protected>} />
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes></BrowserRouter>;
+  </Routes></HashRouter>;
 }
 
 export { Layout };

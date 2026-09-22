@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: attendly-${{ github.workflow }}-${{ github.ref }}
@@ -36,6 +38,11 @@ jobs:
         run: npm ci
       - name: Build frontend
         run: npm run build
+      - name: Upload GitHub Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
 
   backend:
     name: Backend validation
@@ -86,3 +93,16 @@ jobs:
           fi
           curl --fail --silent --show-error --retry 3 --request POST "$DEPLOY_HOOK_URL"
           echo "Deployment hook accepted."
+
+  pages:
+    name: Publish frontend to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
