@@ -1,0 +1,88 @@
+name: CI and deployment
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: attendly-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build frontend
+        run: npm run build
+
+  backend:
+    name: Backend validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate JavaScript
+        run: npm test
+
+  containers:
+    name: Docker build validation
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build --tag attendly-backend:test ./backend
+      - name: Build frontend image
+        run: docker build --tag attendly-frontend:test ./frontend
+
+  deploy:
+    name: Deploy to hosting provider
+    runs-on: ubuntu-latest
+    needs: [containers]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Trigger deployment hook
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DEPLOY_HOOK_URL" ]; then
+            echo "DEPLOY_HOOK_URL is not configured; skipping deployment."
+            echo "Add a repository secret named DEPLOY_HOOK_URL to enable automatic deployment."
+            exit 0
+          fi
+          curl --fail --silent --show-error --retry 3 --request POST "$DEPLOY_HOOK_URL"
+          echo "Deployment hook accepted."
