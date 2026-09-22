@@ -95,7 +95,7 @@ jobs:
           touch /tmp/attendly-pages/.nojekyll
           git fetch origin gh-pages || true
           git worktree add --detach /tmp/attendly-pages-work
-          rm -rf /tmp/attendly-pages-work/* /tmp/attendly-pages-work/.[!.]* /tmp/attendly-pages-work/..?* 2>/dev/null || true
+          find /tmp/attendly-pages-work -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp -R /tmp/attendly-pages/. /tmp/attendly-pages-work/
           cd /tmp/attendly-pages-work
           git add --all
