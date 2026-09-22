@@ -100,4 +100,4 @@ jobs:
           cd /tmp/attendly-pages-work
           git add --all
           git commit --allow-empty -m "deploy: publish frontend from $GITHUB_SHA"
-          git push --force origin HEAD:gh-pages
+          git push --force origin HEAD:refs/heads/gh-pages
