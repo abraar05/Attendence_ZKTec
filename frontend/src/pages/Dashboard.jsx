@@ -1,52 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/client';
+import { EmptyRow, Feedback, PageHeader, formatDate, formatCount, getErrorMessage, getToday, usePageTitle } from '../App.jsx';
 
 export default function Dashboard() {
-  const [devices, setDevices] = useState([]);
-  const [today, setToday] = useState([]);
-
-  useEffect(() => {
-    api.get('/devices').then((r) => setDevices(r.data));
-    const todayStr = new Date().toISOString().slice(0, 10);
-    api.get('/attendance', { params: { startDate: `${todayStr}T00:00:00`, endDate: `${todayStr}T23:59:59`, pageSize: 10 } })
-      .then((r) => setToday(r.data.records));
-  }, []);
-
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      <div className="card">
-        <h3>Device Status</h3>
-        <table>
-          <thead><tr><th>Name</th><th>IP</th><th>Status</th><th>Last Sync</th></tr></thead>
-          <tbody>
-            {devices.map((d) => (
-              <tr key={d.id}>
-                <td>{d.name}</td>
-                <td>{d.ip}</td>
-                <td className={d.status === 'online' ? 'status-online' : 'status-offline'}>{d.status}</td>
-                <td>{d.lastSyncAt ? new Date(d.lastSyncAt).toLocaleString() : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="card">
-        <h3>Latest Punches Today</h3>
-        <table>
-          <thead><tr><th>Employee</th><th>Type</th><th>Time</th><th>Source</th></tr></thead>
-          <tbody>
-            {today.map((r) => (
-              <tr key={r.id}>
-                <td>{r.Employee?.name || `(unmatched: ${r.deviceUserId})`}</td>
-                <td>{r.punchType}</td>
-                <td>{new Date(r.timestamp).toLocaleTimeString()}</td>
-                <td>{r.source}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  usePageTitle('Dashboard');
+  const [devices, setDevices] = useState([]); const [today, setToday] = useState([]); const [error, setError] = useState('');
+  useEffect(() => { Promise.all([api.get('/devices'), api.get('/attendance', { params: { startDate: `${getToday()}T00:00:00`, endDate: `${getToday()}T23:59:59`, pageSize: 10 } })]).then(([d, a]) => { setDevices(d.data); setToday(a.data.records || []); }).catch((e) => setError(getErrorMessage(e))); }, []);
+  const online = devices.filter((d) => d.status === 'online').length;
+  return <><PageHeader eyebrow="Overview" title="Good morning" description="A clear view of your workplace attendance activity today." actions={<button onClick={() => window.location.reload()}>↻ Refresh</button>} />
+    {error && <Feedback error={error} />}
+    <div className="stat-grid"><div className="stat-card"><span>Total devices</span><strong>{formatCount(devices.length)}</strong><small className="stat-note">Connected workspaces</small></div><div className="stat-card"><span>Devices online</span><strong>{formatCount(online)}</strong><small className="stat-note positive">● Live status</small></div><div className="stat-card"><span>Punches today</span><strong>{formatCount(today.length)}</strong><small className="stat-note">Latest activity</small></div><div className="stat-card"><span>Sync health</span><strong>{devices.length ? `${Math.round((online / devices.length) * 100)}%` : '—'}</strong><small className="stat-note">Across devices</small></div></div>
+    <div className="content-grid"><section className="card"><div className="section-heading"><div><p className="eyebrow">Live network</p><h2>Device status</h2></div><span className="section-meta">{online} online</span></div><div className="table-wrap"><table><thead><tr><th>Name</th><th>IP address</th><th>Status</th><th>Last sync</th></tr></thead><tbody>{devices.length ? devices.map((d) => <tr key={d.id}><td><strong>{d.name}</strong><small className="cell-subtitle">{d.model || 'ZKTeco device'}</small></td><td>{d.ip}</td><td><span className={`status-pill ${d.status === 'online' ? 'online' : 'offline'}`}>{d.status}</span></td><td>{formatDate(d.lastSyncAt)}</td></tr>) : <EmptyRow colSpan={4}>No devices configured yet.</EmptyRow>}</tbody></table></div></section><section className="card"><div className="section-heading"><div><p className="eyebrow">Today</p><h2>Latest punches</h2></div><span className="section-meta">{today.length} records</span></div><div className="activity-list">{today.length ? today.map((r) => <div className="activity-item" key={r.id}><span className="activity-dot" /><div><strong>{r.Employee?.name || `Unmatched user ${r.deviceUserId}`}</strong><small>{r.punchType} · {r.source}</small></div><time>{new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>) : <Feedback empty>No punches recorded today.</Feedback>}</div></section></div></>;
 }
